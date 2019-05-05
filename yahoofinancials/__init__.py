@@ -51,6 +51,7 @@ from bs4 import BeautifulSoup
 import datetime
 import pytz
 import random
+import traceback
 try:
     from urllib import FancyURLopener
 except:
@@ -87,6 +88,7 @@ class YahooFinanceETL(object):
         'balance': ['balance-sheet', 'balanceSheetHistory', 'balanceSheetHistoryQuarterly', 'balanceSheetStatements'],
         'cash': ['cash-flow', 'cashflowStatementHistory', 'cashflowStatementHistoryQuarterly', 'cashflowStatements'],
         'keystats': ['key-statistics'],
+        'performance': ['performance', 'fundPerformance'],
         'history': ['history']
     }
 
@@ -251,9 +253,18 @@ class YahooFinanceETL(object):
             # Python 2 and Unicode
             elif sys.version_info < (3, 0) and isinstance(v, unicode):
                 dict_ent = {k: v}
+            elif isinstance(v, list):
+                cleaned_list = []
+                for elem in v:
+                    elem = self._clean_reports(elem)
+                    cleaned_list.append(elem)
+                dict_ent = {k: cleaned_list}
             else:
-                numerical_val = self._determine_numeric_value(v)
-                dict_ent = {k: numerical_val}
+                if 'raw' in v.keys() or len(v) == 0:
+                    numerical_val = self._determine_numeric_value(v)
+                    dict_ent = {k: numerical_val}
+                else:
+                    dict_ent = {k: self._clean_reports(v)}
             cleaned_dict.update(dict_ent)
         return cleaned_dict
 
@@ -534,6 +545,7 @@ class YahooFinanceETL(object):
                     try:
                         cleaned_data = self._clean_reports(raw_report_data[tick])
                     except:
+                        traceback.print_exc()
                         cleaned_data = None
                 cleaned_data_dict.update({tick: cleaned_data})
         return cleaned_data_dict
@@ -603,6 +615,17 @@ class YahooFinancials(YahooFinanceETL):
             return self.get_clean_data(self.get_stock_tech_data('price'), 'price')
         else:
             return self.get_stock_tech_data('price')
+
+    # Public Method for the user to get mutual fund performance data
+    def get_fund_perf_data(self, reformat=True):
+        statement_type = 'performance'
+        tech_type = ''
+        report_name = self.YAHOO_FINANCIAL_TYPES[statement_type][1]
+
+        if reformat:
+            return self.get_clean_data(self.get_stock_data(statement_type, tech_type, report_name=report_name), 'performance')
+        else:
+            return self.get_stock_data(statement_type, tech_type, report_name=report_name)
 
     # Public Method for the user to return key-statistics data
     def get_key_statistics_data(self, reformat=True):
