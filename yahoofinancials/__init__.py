@@ -88,6 +88,8 @@ class YahooFinanceETL(object):
         'balance': ['balance-sheet', 'balanceSheetHistory', 'balanceSheetHistoryQuarterly', 'balanceSheetStatements'],
         'cash': ['cash-flow', 'cashflowStatementHistory', 'cashflowStatementHistoryQuarterly', 'cashflowStatements'],
         'keystats': ['key-statistics'],
+        'profile': ['profile'],
+        'risk': ['risk'],
         'performance': ['performance', 'fundPerformance'],
         'history': ['history']
     }
@@ -238,8 +240,11 @@ class YahooFinanceETL(object):
         cleaned_dict = {}
         if raw_data is None:
             return None
+        if not isinstance(raw_data, dict):
+            return raw_data
         for k, v in raw_data.items():
-            if 'Time' in k:
+            #if 'Time' in k:
+            if k.endswith('Time'):
                 formatted_utc_time = self._format_time(v)
                 dict_ent = {k: formatted_utc_time}
             elif 'Date' in k:
@@ -408,7 +413,10 @@ class YahooFinanceETL(object):
         if tech_type == '' and statement_type != 'history':
             try:
                 re_data = self._scrape_data(YAHOO_URL, tech_type, statement_type)
-                dict_ent = {up_ticker: re_data[u'' + report_name], 'dataType': report_name}
+                if report_name == '':
+                    dict_ent = {up_ticker: re_data, 'dataType': 'fullReport'}
+                else:
+                    dict_ent = {up_ticker: re_data[u'' + report_name], 'dataType': report_name}
             except KeyError:
                 re_data = None
                 dict_ent = {up_ticker: re_data, 'dataType': report_name}
@@ -616,6 +624,13 @@ class YahooFinancials(YahooFinanceETL):
         else:
             return self.get_stock_tech_data('price')
 
+    # Public Method to get stock financial data
+    def get_stock_financial_data(self, reformat=True):
+        if reformat:
+            return self.get_clean_data(self.get_stock_data(statement_type='keystats', tech_type='financialData'), 'financials')
+        else:
+            return self.get_stock_data(statement_type='keystats', tech_type='financialData')
+
     # Public Method for the user to get mutual fund performance data
     def get_fund_perf_data(self, reformat=True):
         statement_type = 'performance'
@@ -626,6 +641,33 @@ class YahooFinancials(YahooFinanceETL):
             return self.get_clean_data(self.get_stock_data(statement_type, tech_type, report_name=report_name), 'performance')
         else:
             return self.get_stock_data(statement_type, tech_type, report_name=report_name)
+
+    # Public Method for the user to get mutual fund profile data
+    def get_profile_data(self, reformat=True):
+        statement_type = 'profile'
+        tech_type = 'assetProfile'
+
+        if reformat:
+            return self.get_clean_data(self.get_stock_data(statement_type, tech_type), 'profile')
+        else:
+            return self.get_stock_data(statement_type, tech_type)
+
+    # Public Method for the user to get mutual fund risk data
+    def get_risk_data(self, reformat=True):
+        statement_type = 'risk'
+        tech_type = ''
+
+        if reformat:
+            return self.get_clean_data(self.get_stock_data(statement_type, tech_type), 'risk')
+        else:
+            return self.get_stock_data(statement_type, tech_type)
+
+    # Public Method for the user to get all the data for the symbol (stock or mutual fund)
+    def get_complete_data(self, reformat=True):
+        if reformat:
+            return self.get_clean_data(self.get_stock_data(), 'complete')
+        else:
+            return self.get_stock_data()
 
     # Public Method for the user to return key-statistics data
     def get_key_statistics_data(self, reformat=True):
